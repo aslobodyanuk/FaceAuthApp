@@ -1,0 +1,212 @@
+﻿@using SmartFaceAuth.Models
+@model LoginFaceViewModel
+@{
+    ViewBag.Title = "Выполнить вход";
+}
+
+<script>
+    var width = 320;
+    var height = 0;
+
+    var costylTop = 10;
+
+    var streaming = false;
+
+    var statusObject = null;
+    var canvas = null;
+    var photoFrame = null;
+    var video = null;
+
+    function startup() {
+        statusObject = document.getElementById("statusText");
+        canvas = document.getElementById("canvas");
+        //photoFrame = document.getElementById("photoFrame");
+        video = document.getElementById("video");
+        startbutton = document.getElementById("startbutton");
+
+        navigator.getMedia = (navigator.getUserMedia ||
+            navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia ||
+            navigator.msGetUserMedia);
+
+        navigator.getMedia(
+            {
+                video: true,
+                audio: false
+            },
+            function (stream) {
+                if (navigator.mozGetUserMedia) {
+                    video.mozSrcObject = stream;
+                } else {
+                    var vendorURL = window.URL || window.webkitURL;
+                    video.src = vendorURL.createObjectURL(stream);
+                }
+                video.play();
+            },
+            function (err) {
+                console.log("An error occured! " + err);
+            }
+        );
+
+        video.addEventListener('canplay', function (ev) {
+            if (!streaming) {
+                height = video.videoHeight / (video.videoWidth / width);
+
+                if (isNaN(height)) {
+                    height = width / (4 / 3);
+                }
+
+                video.setAttribute('width', width);
+                video.setAttribute('height', height);
+                canvas.setAttribute('width', width);
+                canvas.setAttribute('height', height);
+                streaming = true;
+            }
+        }, false);
+
+        startbutton.addEventListener('click', function (ev) {
+            takePicture();
+            ev.preventDefault();
+        }, false);
+
+        //clearPhoto();
+    }
+
+    function takePicture() {
+        var context = canvas.getContext('2d');
+        if (width && height) {
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(video, 0, 0, width, height);
+
+            var data = canvas.toDataURL('image/png');
+            //photoFrame.style.backgroundImage = "url(" + data + ")";
+            uploadFile(dataURLtoFile(data));
+        } else {
+            clearPhoto();
+        }
+    }
+
+    function uploadFile(file) {
+        statusObject.innerText = "Загружаем фото..."
+        var uploaderUrl = "/Face/SaveCandidateFiles";
+        var formData = new FormData();
+        formData.append("file", file);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', uploaderUrl, true);
+        xhr.send(formData);
+        xhr.onloadend = callCheckPicture;
+        statusObject.innerText = "Ждем ответа от сервера...";
+    }
+
+    function dataURLtoFile(dataurl, filename) {
+        var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+            bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+    }
+
+    function callCheckPicture() {
+        var emailNode = document.getElementById("Email");
+        var uploaderUrl = "/Face/ValidatePicture?email=" + emailNode.value;
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+                var result = JSON.parse(xhr.responseText);
+                if (result.IsValid == true && result.IsTrained == true) {
+                    if (result.Smile == true) {
+                        var submitId = document.getElementById("loginSubmitForm");
+                        submitId.submit();
+                        statusObject.innerText = "Ваша улыбка прекрасна, " + result.Name + ".";
+                    }
+                    else {
+                        statusObject.innerText = "Привет, " + result.Name + ". Нажмите вход чтобы войти или улыбнитесь в следующий раз.";
+                    }
+                }
+                else {
+                    if (result.EmailValid == false) {
+                        statusObject.innerText = "Такой Email не зарегестрирован.";
+                    }
+                    else if (result.IsTrained == false) {
+                        statusObject.innerText = "Последние настройки не были сохранены, сохраните настройки в личном кабинете.";
+                    }
+                    else {
+                        statusObject.innerHTML = "Лица не найдены, попробуйте использовать авторизацию с " + "<a href=\"/Account/Login\">паролем</a>" + ".";
+                    }
+                }
+            }
+        }
+        xhr.open('GET', uploaderUrl, false);
+        xhr.send(null);
+    }
+
+    function getPictureResponse() {
+        var backUrl = "/Face/GetDetectedFaces";
+        var httpreq = new XMLHttpRequest();
+        httpreq.open("GET", backUrl, false);
+        httpreq.send(null);
+        var responseText = httpreq.responseText;
+        var result = JSON.parse(responseText);
+        return result;
+    }
+
+    window.addEventListener('load', startup, false);
+</script>
+
+<h2>@ViewBag.Title.</h2>
+<canvas id="canvas" hidden="hidden" width="320" height="240"></canvas>
+<div class="row">
+    <div class="col-md-8">
+        <section id="loginForm">
+            @using (Html.BeginForm("LoginFace", "Account", new { ReturnUrl = ViewBag.ReturnUrl }, FormMethod.Post, new { @class = "form-horizontal", role = "form", id = "loginSubmitForm" }))
+            {
+                @Html.AntiForgeryToken()
+                <h4>Используйте локальную учетную запись для входа.</h4>
+                <hr />
+                @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                <div class="form-group">
+                    @Html.LabelFor(m => m.Email, new { @class = "col-md-4 control-label" })
+                    <div class="col-md-8">
+                        @Html.TextBoxFor(m => m.Email, new { @class = "form-control" })
+                        @Html.ValidationMessageFor(m => m.Email, "", new { @class = "text-danger" })
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="control-label col-md-4">Используйте веб-камеру для подтверждения личности</label>
+                    <div class="col-md-8">
+                        <video id="video">Video stream not available.</video>
+                        <p id="statusText" style="margin-top:5px;">Авторизируйтесь сделав фото.</p>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-offset-4 col-md-10">
+                        <div class="checkbox">
+                            @Html.CheckBoxFor(m => m.RememberMe)
+                            @Html.LabelFor(m => m.RememberMe)
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-offset-4 col-md-10">
+                        <input type="submit" value="Выполнить вход" class="btn btn-default" />
+                        <button id="startbutton" class="btn btn-default">Сделать фото</button>
+                    </div>
+                </div>
+                <p class="col-md-offset-4 col-md-10">
+                    @Html.ActionLink("Регистрация нового пользователя", "Register")
+                </p>
+            }
+        </section>
+    </div>
+    <div class="col-md-4">
+        <section id="socialLoginForm">
+            @Html.Partial("_ExternalLoginsListPartial", new ExternalLoginListViewModel { ReturnUrl = ViewBag.ReturnUrl })
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    @Scripts.Render("~/bundles/jqueryval")
+}

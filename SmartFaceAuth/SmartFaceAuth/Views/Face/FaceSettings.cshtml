@@ -1,0 +1,110 @@
+﻿@model SmartFaceAuth.Models.PersonForJs
+
+<script>
+
+    function fillData() {
+        var baseObject = document.getElementById("baseObject");
+        var personsCount = @Model.PersonIds.Count;
+        var names = @Html.Raw(Json.Encode(Model.Names));
+        var images = @Html.Raw(Json.Encode(Model.SrcImages));
+        var personIds = @Html.Raw(Json.Encode(Model.PersonIds));
+        var intIds = @Html.Raw(Json.Encode(Model.Ids));
+        var isTrained = @Html.Raw(Json.Encode(Model.IsTrained));
+        var divCount = 1;
+
+        var newObject = document.createElement("div");
+        newObject.className = "cardGroup";
+        baseObject.appendChild(newObject);
+        for (var counter = 0; counter < personsCount; counter++) {
+                var newCardDiv = document.createElement("div");
+                newCardDiv.className = "card";
+                newObject.appendChild(newCardDiv);
+
+                var newImgDiv = document.createElement("div");
+                newImgDiv.className = "containerImage";
+                newImgDiv.style.backgroundImage = "url(" + images[counter] + ")";
+                newCardDiv.appendChild(newImgDiv);
+
+                var newInfoDiv = document.createElement("div");
+                newInfoDiv.className = "containerCard";
+                newCardDiv.appendChild(newInfoDiv);
+
+                newInfoDiv.innerHTML = "<h4><b>" + names[counter] + "</h4></b>" + "<p><a href=\"AddUserFace?id=" + intIds[counter] + "\">Add Face</a> <a href=\"DeleteUser?id=" + intIds[counter] + "\">Delete</a></p>";
+        }
+        var newCardDiv = document.createElement("div");
+        newCardDiv.className = "card";
+        newObject.appendChild(newCardDiv);
+        newCardDiv.onclick = function () {
+            window.location.href = "@Url.Action("AddNewUserFace","Face")";
+        }
+
+        var newImgDiv = document.createElement("div");
+        newImgDiv.className = "containerImage";
+        newImgDiv.style.backgroundImage = "url(/Content/Plus.png)";
+        newCardDiv.appendChild(newImgDiv);
+
+        var newInfoDiv = document.createElement("div");
+        newInfoDiv.className = "containerCard";
+        newCardDiv.appendChild(newInfoDiv);
+        newInfoDiv.innerHTML = "<h4><b>Add new person</h4></b><p>Click here to add new person</p>";
+
+        if (isTrained == false) {
+            var newCardDiv = document.createElement("div");
+            newCardDiv.className = "card";
+            newObject.appendChild(newCardDiv);
+            newCardDiv.onclick = function () {
+                var saveTextObj = document.getElementById("saveTextObj");
+                saveTextObj.innerHTML = "<h4><b>Started group training</h4></b><p>Your changes will be saved</p>"
+                var backUrl = "/Face/ExecuteGroupTraining";
+                var httpreq = new XMLHttpRequest();
+                httpreq.open("GET", backUrl, false);
+                httpreq.send(null);
+            }
+
+            var newImgDiv = document.createElement("div");
+            newImgDiv.className = "containerImage";
+            newImgDiv.style.backgroundImage = "url(/Content/Save.png)";
+            newCardDiv.appendChild(newImgDiv);
+
+            var newInfoDiv = document.createElement("div");
+            newInfoDiv.className = "containerCard";
+            newInfoDiv.id = "saveTextObj";
+            newCardDiv.appendChild(newInfoDiv);
+            newInfoDiv.innerHTML = "<h4><b>Save changes</h4></b><p>Execute group training</p>";
+        }
+    }
+
+    window.addEventListener('load', fillData, false);
+</script>
+
+<h2>FaceSettings</h2>
+<div id="baseObject">
+
+</div>
+
+<style>
+    .containerImage {
+        width: 250px;
+        height: 250px;
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: 50% 50%;
+    }
+
+    .card {
+    width: 250px;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    transition: 0.3s;
+    margin: 20px 20px 20px 20px;
+    }
+
+    .card:hover {
+        box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+    }
+
+    .containerCard {
+        padding: 2px 16px;
+    }
+
+    .cardGroup div { display:inline-block; }
+</style>

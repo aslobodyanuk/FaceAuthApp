@@ -1,0 +1,270 @@
+﻿
+<script>
+    var width = 320;
+    var height = 0;
+
+    var costylTop = 10;
+
+    var streaming = false;
+
+    var statusObject = null;
+    var canvas = null;
+    var photoFrame = null;
+    var video = null;
+
+    function startup() {
+        statusObject = document.getElementById("statusText");
+        canvas = document.getElementById("canvas");
+        photoFrame = document.getElementById("photoFrame");
+        video = document.getElementById("video");
+        startbutton = document.getElementById('startbutton');
+
+        navigator.getMedia = (navigator.getUserMedia ||
+            navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia ||
+            navigator.msGetUserMedia);
+
+        navigator.getMedia(
+            {
+                video: true,
+                audio: false
+            },
+            function (stream) {
+                if (navigator.mozGetUserMedia) {
+                    video.mozSrcObject = stream;
+                } else {
+                    var vendorURL = window.URL || window.webkitURL;
+                    video.src = vendorURL.createObjectURL(stream);
+                }
+                video.play();
+            },
+            function (err) {
+                console.log("An error occured! " + err);
+            }
+        );
+
+        video.addEventListener('canplay', function (ev) {
+            if (!streaming) {
+                height = video.videoHeight / (video.videoWidth / width);
+
+                if (isNaN(height)) {
+                    height = width / (4 / 3);
+                }
+
+                video.setAttribute('width', width);
+                video.setAttribute('height', height);
+                canvas.setAttribute('width', width);
+                canvas.setAttribute('height', height);
+                streaming = true;
+            }
+        }, false);
+
+        startbutton.addEventListener('click', function (ev) {
+            takePicture();
+            ev.preventDefault();
+        }, false);
+
+        clearPhoto();
+    }
+
+    function uploadFile(file) {
+        statusObject.innerText = "Uploading image..."
+        var uploaderUrl = "/Face/SaveCandidateFiles";
+        var formData = new FormData();
+        formData.append("file", file);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', uploaderUrl, true);
+        xhr.onloadend = fillPhotoDisplay;
+        xhr.send(formData);
+        statusObject.innerText = "Waiting for response...";
+    }
+
+    function clearPhoto() {
+        var context = canvas.getContext('2d');
+        context.fillStyle = "#AAA";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        var data = canvas.toDataURL('image/png');
+        photoFrame.style.backgroundImage = "url(" + data + ")";
+    }
+
+    function previewFile() {
+        var file = document.querySelector('input[type=file]').files[0];
+        var reader = new FileReader();
+
+        reader.onloadend = function () {
+            //photoFrame.style.backgroundImage = "url(" + reader.result + ")";
+        }
+
+        if (file) {
+            reader.readAsDataURL(file);
+            uploadFile(file);
+            //fillPhotoDisplay();
+        } else {
+            photoFrame.style.backgroundImage = "";
+        }
+    }
+
+    function takePicture() {
+        var context = canvas.getContext('2d');
+        if (width && height) {
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(video, 0, 0, width, height);
+
+            var data = canvas.toDataURL('image/png');
+            //photoFrame.style.backgroundImage = "url(" + data + ")";
+            uploadFile(dataURLtoFile(data));
+        } else {
+            clearPhoto();
+        }
+    }
+
+    function dataURLtoFile(dataurl, filename) {
+        var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+            bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+    }
+
+    function faceRectClick(objectId, faceId) {
+        var inputNameNode = document.getElementById("inputUserName");
+        var inputNameText = inputNameNode.value;
+        if (inputNameText != "") {
+            var backUrl = "/Face/ChoseNewPersonToAdd?id=" + faceId + "&name=" + inputNameText;
+            var httpreq = new XMLHttpRequest();
+            httpreq.onloadend = function () {
+                window.location.href = "@Url.Action("FaceSettings", "Face")";
+            }
+            httpreq.open("GET", backUrl, false);
+            httpreq.send(null);
+            var responseText = httpreq.responseText;
+            var result = JSON.parse(responseText);
+        }
+        else {
+            inputNameNode.style.borderColor = "#FF0000";
+            inputNameNode.style.borderStyle = "solid";
+            inputNameNode.style.borderWidth = "2px";
+        }
+    }
+
+    function getPictureResponse() {
+        var backUrl = "/Face/GetDetectedFaces";
+        var httpreq = new XMLHttpRequest();
+        httpreq.open("GET", backUrl, false);
+        httpreq.send(null);
+        var responseText = httpreq.responseText;
+        var result = JSON.parse(responseText);
+        return result;
+    }
+
+    function fillPhotoDisplay() {
+        statusObject.innerText = "Filling image with data...";
+        var response = getPictureResponse();
+        var queryFace = response.QueryFaceImage;
+        //var detectedResultsMessage = response.DetectedResults;
+        detectedFaces = response.FaceInfo;
+        var faceRectangles = response.FaceRectangles;
+
+        var canvas = document.getElementById('photoFrame');
+        canvas.innerHTML = "";
+
+        var elemImg = document.createElement("img");
+        elemImg.setAttribute("src", queryFace);
+        elemImg.setAttribute("width", response.MaxImageSize);
+        elemImg.id = 'faceCanvas_img';
+        canvas.append(elemImg);
+        var imgRect = elemImg.getBoundingClientRect();
+
+        statusObject.innerText = "Found " + faceRectangles.length + " faces. Chose a person to allow login."
+        for (var count = 0; count < faceRectangles.length; count++) {
+            var divRectangle = document.createElement('div');
+            var width = faceRectangles[count].Width;
+            var height = faceRectangles[count].Height;
+            var top = faceRectangles[count].Top + imgRect.top - costylTop;
+            var left = faceRectangles[count].Left + imgRect.left;
+
+            //Style Div
+            divRectangle.className = 'divRectangle_box';
+            divRectangle.style.width = width + 'px';
+            divRectangle.style.height = height + 'px';
+            divRectangle.style.position = 'absolute';
+            divRectangle.style.top = top + 'px';
+            divRectangle.style.left = left + 'px';
+            divRectangle.style.zIndex = '999';
+            divRectangle.style.border = '1px solid #ff6347';
+            divRectangle.style.margin = '0';
+            divRectangle.id = 'divRectangle_' + (count + 1);
+            divRectangle.faceId = detectedFaces[count].FaceId;
+            divRectangle.onclick = function () {
+                faceRectClick(this.id, this.faceId);
+            };
+
+            //Generate rectangles
+            canvas.append(divRectangle);
+        }
+    }
+
+    window.addEventListener('load', startup, false);
+</script>
+
+<h2>Add New User Face</h2>
+<p>Use your webcam to make a photo or upload your own.</p>
+<canvas id="canvas" hidden="hidden" width="320" height="240"></canvas>
+<div>
+    <table style="width:100%">
+        <tr>
+            <th><h4>Select Image</h4></th>
+            <th><h4>Detection Result</h4></th>
+        </tr>
+        <tr>
+            <td>
+                <div style="margin-top:10px;margin-bottom:10px;">
+                    Provide person name:
+                    <input type="text" style="width:100%;" id="inputUserName" required />
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="file" id="inputFile" name="file" accept="image/*" onchange="previewFile()" required />
+            </td>
+            <td id="statusText">
+                Here will be displayed progress.
+            </td>
+        </tr>
+        <tr>
+            <td style="width:50%">
+                <div class="optionsGroup">
+                    <div>
+                        <video id="video">Video stream not available.</video>
+                    </div>
+                </div>
+            </td>
+            <td style="width:50%">
+                <div id="photoFrame" class="containerImage"></div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<button id="startbutton">Take photo</button>
+
+
+
+<style>
+    .optionsGroup div {
+        margin-top: 10px;
+        margin-bottom: 10px;
+        display: inline-block;
+    }
+
+    .containerImage {
+        width: 320px;
+        height: 240px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: 50% 50%;
+    }
+</style>

@@ -1,0 +1,66 @@
+﻿@model SmartFaceAuth.Models.AuthLogs
+
+<script>
+    function fillData() {
+        var baseObject = document.getElementById("baseObject");
+        var arrayLength = @Model.Dates.Length;
+        var model = @Html.Raw(Json.Encode(Model));
+
+        var newObject = document.createElement("div");
+        newObject.className = "cardGroup";
+        baseObject.appendChild(newObject);
+        for (var counter = 0; counter < arrayLength; counter++) {
+                var newCardDiv = document.createElement("div");
+                newCardDiv.className = "card";
+                newObject.appendChild(newCardDiv);
+
+                var newImgDiv = document.createElement("div");
+                newImgDiv.className = "containerImage";
+                newImgDiv.style.backgroundImage = "url(" + model.SrcImages[counter] + ")";
+                newCardDiv.appendChild(newImgDiv);
+
+                var newInfoDiv = document.createElement("div");
+                newInfoDiv.className = "containerCard";
+                newCardDiv.appendChild(newInfoDiv);
+
+                newInfoDiv.innerHTML = "<h4><b>Authorization log</h4></b><p>" + model.Dates[counter] + "</p>";
+        }
+    }
+
+    window.addEventListener('load', fillData, false);
+</script>
+
+<h2>Authorization logs</h2>
+<div id="baseObject">
+
+</div>
+
+<style>
+    .containerImage {
+        width: 250px;
+        height: 250px;
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: 50% 50%;
+    }
+
+    .card {
+        width: 250px;
+        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+        transition: 0.3s;
+        margin: 20px 20px 20px 20px;
+    }
+
+        .card:hover {
+            box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+        }
+
+    .containerCard {
+        padding: 2px 16px;
+    }
+
+    .cardGroup div {
+        display: inline-block;
+    }
+</style>
+
